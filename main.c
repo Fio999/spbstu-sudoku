@@ -1,5 +1,6 @@
-#include "glad.h"
+#include <glad/gl.h>
 #include <GL/freeglut.h>
+#include <EGL/egl.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -204,7 +205,7 @@ int main(int argc, char** argv) {
     glutInitWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
     glutCreateWindow("Sudoku Solver");
 
-    if(!gladLoadGL()) {
+    if(!gladLoadGL(eglGetProcAddress)) {
         printf("Failed to initialize GLAD\n");
         return -1;
     }

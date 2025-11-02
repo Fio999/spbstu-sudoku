@@ -1,13 +1,23 @@
+#define _GNU_SOURCE
 #include <glad/gl.h>
 #include <GL/freeglut.h>
 #include <EGL/egl.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define EXTRA_RENDER
 
 #define WINDOW_WIDTH 600
 #define WINDOW_HEIGHT 680
 #define CELL_SIZE (WINDOW_WIDTH / 9)
 #define GRID_SIZE 9
+#define CELL_AMT (GRID_SIZE * GRID_SIZE)
+#define TEST_AMT 1
+
+char** tests;
+clock_t* btimes;
 
 int sudokuGrid[9][9];
 int selectedRow = -1, selectedCol = -1;
@@ -55,13 +65,19 @@ void drawNumbers() {
     }
 }
 
-void drawButton() {
+void drawButtons() {
     glColor3f(0.8f, 0.8f, 0.8f);
     glRectf(WINDOW_WIDTH/2 - 50, WINDOW_HEIGHT - 60, 
            WINDOW_WIDTH/2 + 50, WINDOW_HEIGHT - 20);
     
     glColor3f(0.0f, 0.0f, 0.0f);
-    drawText(WINDOW_WIDTH/2 - 30, WINDOW_HEIGHT - 55, "Solve");
+    drawText(WINDOW_WIDTH/2 - 25, WINDOW_HEIGHT - 45, "Solve");
+
+    glColor3f(0.8f, 0.8f, 0.8f);
+    glRectf(20, WINDOW_HEIGHT - 20, 120, WINDOW_HEIGHT - 60);
+    
+    glColor3f(0.0f, 0.0f, 0.0f);
+    drawText(35, WINDOW_HEIGHT - 45, "Run test");
 }
 
 void display() {
@@ -81,7 +97,7 @@ void display() {
     }
 
     drawNumbers();
-    drawButton();
+    drawButtons();
 
     glutSwapBuffers();
 }
@@ -123,6 +139,66 @@ int sudokuSolver(int grid[9][9]) {
     return 1;
 }
 
+void loadTests(char* filename) {
+    FILE* fptr;
+    char* line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    fptr = fopen(filename, "r");
+    if (!fptr) {
+        printf("ERROR: couldn't read test file");
+        return;
+    }
+
+    int cnt = 0;
+    tests = (char**)calloc(TEST_AMT, sizeof(char*));
+    if (!tests) exit(-1);
+    while ((read = getline(&line, &len, fptr)) != -1) {
+        tests[cnt] = (char*)calloc(CELL_AMT, sizeof(char));
+        if (!tests[cnt]) exit(-1);
+        for (ssize_t i = 0; i < CELL_AMT; i++) {
+            tests[cnt][i] = (line[i] == '_') ? -1 : line[i] - '0';
+        }
+        if (++cnt > TEST_AMT) break;
+    }
+
+    fclose(fptr);
+    if (line) free(line);
+}
+
+void benchmark() {
+    loadTests("tests");
+    btimes = (clock_t*)calloc(TEST_AMT, sizeof(clock_t));
+    clock_t stime = 0;
+
+    for (int i = 0; i < TEST_AMT; i++) {
+        for (int j = 0; j < CELL_AMT; j++) {
+            sudokuGrid[j / GRID_SIZE][j % GRID_SIZE] = (int)tests[i][j];
+        }
+        btimes[i] = clock();
+        sudokuSolver(sudokuGrid);
+        btimes[i] = clock() - btimes[i];
+        stime += btimes[i];
+        glutPostRedisplay();
+    }
+
+    clock_t atime = stime /= TEST_AMT;
+    FILE* rptr = fopen("benchmark-report", "w");
+    fprintf(rptr, "TOTAL: %Lf (%llu).\n", (long double)(stime / CLOCKS_PER_SEC), (unsigned long long int)(stime));
+    fprintf(rptr, "AVERAGE: %Lf (%llu).\n\n", (long double)(atime / CLOCKS_PER_SEC), (unsigned long long int)(atime));
+    fprintf(rptr, "CLOCKS PER SEC: %llu.\n\n", (unsigned long long int)(CLOCKS_PER_SEC));
+
+    for (int i = 0; i < TEST_AMT; i++) {
+        fprintf(rptr, "%03d %llu\n", i, (unsigned long long int)btimes[i]);
+    }
+    fclose(rptr);
+
+    for (int i = 0; i < TEST_AMT; i++) free(tests[i]);
+    free(tests);
+    free(btimes);
+}
+
 void mouseClick(int button, int state, int x, int y) {
     if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
         y = WINDOW_HEIGHT - y;
@@ -131,6 +207,14 @@ void mouseClick(int button, int state, int x, int y) {
            x > WINDOW_WIDTH/2 - 50 && x < WINDOW_WIDTH/2 + 50) {
             // Solve button clicked
             sudokuSolver(sudokuGrid);
+            glutPostRedisplay();
+            return;
+        }
+
+        if(y > WINDOW_HEIGHT - 20 && y < WINDOW_HEIGHT - 60 &&
+           x > 20 && x < 120) {
+            // Benchmark button clicked
+            benchmark();
             glutPostRedisplay();
             return;
         }
@@ -184,6 +268,8 @@ void keyboard(unsigned char key, int x, int y) {
         memset(sudokuGrid, -1, sizeof(sudokuGrid));
     } else if (key == 13) { //Enter
         sudokuSolver(sudokuGrid);
+    } else if (key == 32) { //Space
+        benchmark();
     }
 
     glutPostRedisplay();

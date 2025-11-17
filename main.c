@@ -14,7 +14,7 @@
 #define CELL_SIZE (WINDOW_WIDTH / 9)
 #define GRID_SIZE 9
 #define CELL_AMT (GRID_SIZE * GRID_SIZE)
-#define TEST_AMT 1
+#define TEST_AMT 100
 
 char** tests;
 clock_t* btimes;
@@ -183,10 +183,10 @@ void benchmark() {
         glutPostRedisplay();
     }
 
-    clock_t atime = stime /= TEST_AMT;
+    clock_t atime = stime / TEST_AMT;
     FILE* rptr = fopen("benchmark-report", "w");
-    fprintf(rptr, "TOTAL: %Lf (%llu).\n", (long double)(stime / CLOCKS_PER_SEC), (unsigned long long int)(stime));
-    fprintf(rptr, "AVERAGE: %Lf (%llu).\n\n", (long double)(atime / CLOCKS_PER_SEC), (unsigned long long int)(atime));
+    fprintf(rptr, "TOTAL: %Lf (%llu).\n", (long double)stime / (long double)CLOCKS_PER_SEC, (unsigned long long int)(stime));
+    fprintf(rptr, "AVERAGE: %Lf (%llu).\n\n", (long double)atime / (long double)CLOCKS_PER_SEC, (unsigned long long int)(atime));
     fprintf(rptr, "CLOCKS PER SEC: %llu.\n\n", (unsigned long long int)(CLOCKS_PER_SEC));
 
     for (int i = 0; i < TEST_AMT; i++) {

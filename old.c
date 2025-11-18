@@ -102,7 +102,7 @@ void display() {
     glutSwapBuffers();
 }
 
-/*int isValid(int box[GRID_SIZE][GRID_SIZE], int row, int col, int num) {
+int isValid(int box[GRID_SIZE][GRID_SIZE], int row, int col, int num) {
     for (int x = 0; x < GRID_SIZE; x++) {
         if (box[row][x] == num || box[x][col] == num)
             return 0;
@@ -117,76 +117,9 @@ void display() {
                 return 0;
 
     return 1;
-}*/
-
-int isValid(int grid[GRID_SIZE][GRID_SIZE], int row, int col, int num) {
-    for (int x = 0; x < GRID_SIZE; x++) {
-        if (grid[row][x] == num || grid[x][col] == num)
-            return 0;
-    }
-
-    int startRow = row - row % 3;
-    int startCol = col - col % 3;
-
-    for (int i = 0; i < 3; i++)
-        for (int j = 0; j < 3; j++)
-            if (grid[startRow + i][startCol + j] == num)
-                return 0;
-
-    return 1;
 }
 
-// ----------- MRV: ищем клетку с минимальным количеством допустимых значений ----------
-int findMRVCell(int grid[GRID_SIZE][GRID_SIZE], int* bestRow, int* bestCol) {
-    int minOptions = 10; // максимум - 9
-
-    for (int row = 0; row < GRID_SIZE; row++) {
-        for (int col = 0; col < GRID_SIZE; col++) {
-
-            if (grid[row][col] != -1) continue;
-
-            int count = 0;
-            for (int num = 1; num <= 9; num++)
-                if (isValid(grid, row, col, num))
-                    count++;
-
-            //if (count == 0) return 0;  // нет возможных значений ? тупик
-
-            if (count < minOptions) {
-                minOptions = count;
-                *bestRow = row;
-                *bestCol = col;
-            }
-        }
-    }
-    return (minOptions != 10);
-}
-
-// -------------------- Sudoku solver с MRV -----------------------
-int sudokuSolver(int grid[GRID_SIZE][GRID_SIZE]) {
-    int row, col;
-
-    // выбрать клетку с минимальным количеством допустимых значений
-    if (!findMRVCell(grid, &row, &col))
-        return 1; // нет пустых — решение найдено
-
-        // пробуем допустимые значения
-        for (int num = 1; num <= 9; num++) {
-            if (isValid(grid, row, col, num)) {
-                grid[row][col] = num;
-
-                if (sudokuSolver(grid))
-                    return 1;
-
-                grid[row][col] = -1; // откат
-            }
-        }
-
-        return 0; // тупик
-}
-
-
-/*// solver function
+// solver function
 int sudokuSolver(int grid[9][9]) {
     for (int row = 0; row < GRID_SIZE; row++) {
         for (int col = 0; col < GRID_SIZE; col++) {
@@ -204,7 +137,7 @@ int sudokuSolver(int grid[9][9]) {
         }
     }
     return 1;
-}*/
+}
 
 void loadTests(char* filename) {
     FILE* fptr;

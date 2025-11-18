@@ -58,3 +58,5 @@ dkms.conf
 /.direnv
 benchmark-report
 main
+fast
+old

@@ -22,11 +22,6 @@ clock_t* btimes;
 int sudokuGrid[9][9];
 int selectedRow = -1, selectedCol = -1;
 
-int rowMask[GRID_SIZE];
-int colMask[GRID_SIZE];
-int blockMask[GRID_SIZE];
-#define FULL_MASK ((1 << 9) - 1)   // 9 младших бит = 111111111
-
 void drawText(float x, float y, const char* text) {
     glRasterPos2f(x, y);
     glutBitmapString(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)text);
@@ -34,12 +29,11 @@ void drawText(float x, float y, const char* text) {
 
 void drawGrid() {
     glColor3f(0.5f, 0.5f, 0.5f);
-
-    for (int i = 0; i <= 9; i++) {
+    
+    for(int i = 0; i <= 9; i++) {
         if (i % 3 == 0) {
             glLineWidth(2.0f);
-        }
-        else {
+        } else {
             glLineWidth(1.0f);
         }
 
@@ -47,7 +41,7 @@ void drawGrid() {
         glVertex2f(i * CELL_SIZE, 0);
         glVertex2f(i * CELL_SIZE, WINDOW_WIDTH);
         glEnd();
-
+        
         glBegin(GL_LINES);
         glVertex2f(0, i * CELL_SIZE);
         glVertex2f(WINDOW_WIDTH, i * CELL_SIZE);
@@ -58,14 +52,14 @@ void drawGrid() {
 void drawNumbers() {
     char str[2];
     str[1] = '\0';
-
+    
     glColor3f(0.0f, 0.0f, 0.0f);
-    for (int i = 0; i < 9; i++) {
-        for (int j = 0; j < 9; j++) {
-            if (sudokuGrid[i][j] != -1) {
+    for(int i = 0; i < 9; i++) {
+        for(int j = 0; j < 9; j++) {
+            if(sudokuGrid[i][j] != -1) {
                 str[0] = sudokuGrid[i][j] + '0';
-                drawText(j * CELL_SIZE + CELL_SIZE / 2 - 4,
-                    (9 - i) * CELL_SIZE - CELL_SIZE / 2 - 8, str);
+                drawText(j * CELL_SIZE + CELL_SIZE/2 - 4, 
+                        (9 - i) * CELL_SIZE - CELL_SIZE/2 - 8, str);
             }
         }
     }
@@ -73,15 +67,15 @@ void drawNumbers() {
 
 void drawButtons() {
     glColor3f(0.8f, 0.8f, 0.8f);
-    glRectf(WINDOW_WIDTH / 2 - 50, WINDOW_HEIGHT - 60,
-        WINDOW_WIDTH / 2 + 50, WINDOW_HEIGHT - 20);
-
+    glRectf(WINDOW_WIDTH/2 - 50, WINDOW_HEIGHT - 60, 
+           WINDOW_WIDTH/2 + 50, WINDOW_HEIGHT - 20);
+    
     glColor3f(0.0f, 0.0f, 0.0f);
-    drawText(WINDOW_WIDTH / 2 - 25, WINDOW_HEIGHT - 45, "Solve");
+    drawText(WINDOW_WIDTH/2 - 25, WINDOW_HEIGHT - 45, "Solve");
 
     glColor3f(0.8f, 0.8f, 0.8f);
     glRectf(20, WINDOW_HEIGHT - 20, 120, WINDOW_HEIGHT - 60);
-
+    
     glColor3f(0.0f, 0.0f, 0.0f);
     drawText(35, WINDOW_HEIGHT - 45, "Run test");
 }
@@ -96,10 +90,10 @@ void display() {
 
     drawGrid();
 
-    if (selectedRow != -1 && selectedCol != -1) {
+    if(selectedRow != -1 && selectedCol != -1) {
         glColor4f(0.3f, 0.3f, 1.0f, 0.3f);
         glRectf(selectedCol * CELL_SIZE, (9 - selectedRow - 1) * CELL_SIZE,
-            (selectedCol + 1) * CELL_SIZE, (9 - selectedRow) * CELL_SIZE);
+                (selectedCol + 1) * CELL_SIZE, (9 - selectedRow) * CELL_SIZE);
     }
 
     drawNumbers();
@@ -125,101 +119,70 @@ void display() {
     return 1;
 }*/
 
-void initMasks() {
-    for (int i = 0; i < GRID_SIZE; i++) {
-        rowMask[i] = 0;
-        colMask[i] = 0;
-        blockMask[i] = 0;
+int isValid(int grid[GRID_SIZE][GRID_SIZE], int row, int col, int num) {
+    for (int x = 0; x < GRID_SIZE; x++) {
+        if (grid[row][x] == num || grid[x][col] == num)
+            return 0;
     }
 
-    for (int r = 0; r < GRID_SIZE; r++) {
-        for (int c = 0; c < GRID_SIZE; c++) {
-            int v = sudokuGrid[r][c];
-            if (v >= 1 && v <= 9) {
-                int bit = 1 << (v - 1);
-                int b = (r / 3) * 3 + (c / 3);
-                rowMask[r] |= bit;
-                colMask[c] |= bit;
-                blockMask[b] |= bit;
-            }
-        }
-    }
+    int startRow = row - row % 3;
+    int startCol = col - col % 3;
+
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+            if (grid[startRow + i][startCol + j] == num)
+                return 0;
+
+    return 1;
 }
 
-
-// ----------- MRV: ищем клетку с минимальным количеством допустимых значений ----------
+// ----------- MRV: РёС‰РµРј РєР»РµС‚РєСѓ СЃ РјРёРЅРёРјР°Р»СЊРЅС‹Рј РєРѕР»РёС‡РµСЃС‚РІРѕРј РґРѕРїСѓСЃС‚РёРјС‹С… Р·РЅР°С‡РµРЅРёР№ ----------
 int findMRVCell(int grid[GRID_SIZE][GRID_SIZE], int* bestRow, int* bestCol) {
-    int minOptions = 10; // максимум - 9
-    int found = 0;
+    int minOptions = 10; // РјР°РєСЃРёРјСѓРј - 9
 
     for (int row = 0; row < GRID_SIZE; row++) {
         for (int col = 0; col < GRID_SIZE; col++) {
 
             if (grid[row][col] != -1) continue;
 
-            int b = (row / 3) * 3 + (col / 3); // блок 
-            int used = rowMask[row] | colMask[col] | blockMask[b];
-            int domain = (~used) & FULL_MASK; // какие числа ещё можно
-
-            if (domain == 0)
-                return -1; 
-
             int count = 0;
-            for (int k = 0; k < 9; k++) {
-                if (domain & (1 << k))
+            for (int num = 1; num <= 9; num++)
+                if (isValid(grid, row, col, num))
                     count++;
-            }
+
+            //if (count == 0) return 0;  // РЅРµС‚ РІРѕР·РјРѕР¶РЅС‹С… Р·РЅР°С‡РµРЅРёР№ ? С‚СѓРїРёРє
 
             if (count < minOptions) {
                 minOptions = count;
                 *bestRow = row;
                 *bestCol = col;
-                found = 1;
             }
         }
     }
-    return found; // 0, если пустых клеток нет
+    return (minOptions != 10);
 }
 
-// -------------------- Sudoku solver с MRV + Bitmask -----------------------
+// -------------------- Sudoku solver СЃ MRV -----------------------
 int sudokuSolver(int grid[GRID_SIZE][GRID_SIZE]) {
     int row, col;
 
-    // выбрать клетку с минимальным количеством допустимых значений
-    int res = findMRVCell(grid, &row, &col);
-    if (res == 0)
-        return 1; // нет пустых — решение найдено
-    if (res == -1)
-        return 0; // тупик
+    // РІС‹Р±СЂР°С‚СЊ РєР»РµС‚РєСѓ СЃ РјРёРЅРёРјР°Р»СЊРЅС‹Рј РєРѕР»РёС‡РµСЃС‚РІРѕРј РґРѕРїСѓСЃС‚РёРјС‹С… Р·РЅР°С‡РµРЅРёР№
+    if (!findMRVCell(grid, &row, &col))
+        return 1; // РЅРµС‚ РїСѓСЃС‚С‹С… вЂ” СЂРµС€РµРЅРёРµ РЅР°Р№РґРµРЅРѕ
 
-    int b = (row / 3) * 3 + (col / 3);
-    int used = rowMask[row] | colMask[col] | blockMask[b];
-    int domain = (~used) & FULL_MASK;
+        // РїСЂРѕР±СѓРµРј РґРѕРїСѓСЃС‚РёРјС‹Рµ Р·РЅР°С‡РµРЅРёСЏ
+        for (int num = 1; num <= 9; num++) {
+            if (isValid(grid, row, col, num)) {
+                grid[row][col] = num;
 
-    // пробуем допустимые значения, проходя по битам domain
-    for (int k = 0; k < 9; k++) {
-        int bit = 1 << k;
-        if (!(domain & bit)) continue; // это число нельзя
+                if (sudokuSolver(grid))
+                    return 1;
 
-        int num = k + 1;
+                grid[row][col] = -1; // РѕС‚РєР°С‚
+            }
+        }
 
-        // ставим число
-        grid[row][col] = num;
-        rowMask[row] |= bit;
-        colMask[col] |= bit;
-        blockMask[b] |= bit;
-
-        if (sudokuSolver(grid))
-            return 1;
-
-        // откат
-        grid[row][col] = -1;
-        rowMask[row] &= ~bit;
-        colMask[col] &= ~bit;
-        blockMask[b] &= ~bit;
-    }
-
-    return 0; // тупик
+        return 0; // С‚СѓРїРёРє
 }
 
 
@@ -280,7 +243,6 @@ void benchmark() {
         for (int j = 0; j < CELL_AMT; j++) {
             sudokuGrid[j / GRID_SIZE][j % GRID_SIZE] = (int)tests[i][j];
         }
-        initMasks();
         btimes[i] = clock();
         sudokuSolver(sudokuGrid);
         btimes[i] = clock() - btimes[i];
@@ -305,20 +267,19 @@ void benchmark() {
 }
 
 void mouseClick(int button, int state, int x, int y) {
-    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+    if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
         y = WINDOW_HEIGHT - y;
-
-        if (y > WINDOW_HEIGHT - 60 && y < WINDOW_HEIGHT - 20 &&
-            x > WINDOW_WIDTH / 2 - 50 && x < WINDOW_WIDTH / 2 + 50) {
-            initMasks();
+        
+        if(y > WINDOW_HEIGHT - 60 && y < WINDOW_HEIGHT - 20 &&
+           x > WINDOW_WIDTH/2 - 50 && x < WINDOW_WIDTH/2 + 50) {
             // Solve button clicked
             sudokuSolver(sudokuGrid);
             glutPostRedisplay();
             return;
         }
 
-        if (y > WINDOW_HEIGHT - 20 && y < WINDOW_HEIGHT - 60 &&
-            x > 20 && x < 120) {
+        if(y > WINDOW_HEIGHT - 20 && y < WINDOW_HEIGHT - 60 &&
+           x > 20 && x < 120) {
             // Benchmark button clicked
             benchmark();
             glutPostRedisplay();
@@ -340,51 +301,41 @@ void keyboard(unsigned char key, int x, int y) {
     if (selectedRow != -1 && selectedCol != -1) {
         if (key >= '1' && key <= '9') {
             sudokuGrid[selectedRow][selectedCol] = key - '0';
-        }
-        else if (key == 8) { // Backspace
+        } else if (key == 8) { // Backspace
             sudokuGrid[selectedRow][selectedCol] = -1;
         }
     }
 
     if (key == 'w') {
         selectedRow--;
-    }
-    else if (key == 's') {
+    } else if (key == 's') {
         selectedRow++;
-    }
-    else if (key == 'a') {
+    } else if (key == 'a') {
         selectedCol--;
-    }
-    else if (key == 'd') {
+    } else if (key == 'd') {
         selectedCol++;
     }
 
     if (key == 27) { //Escape
         selectedCol = selectedRow = -1;
-    }
-    else {
+    } else {
         if (selectedRow < 0) {
             selectedRow = 8;
-        }
-        else if (selectedRow > 8) {
+        } else if (selectedRow > 8) {
             selectedRow = 0;
         }
         if (selectedCol < 0) {
             selectedCol = 8;
-        }
-        else if (selectedCol > 8) {
+        } else if (selectedCol > 8) {
             selectedCol = 0;
         }
     }
 
     if (key == 127) { //Delete
         memset(sudokuGrid, -1, sizeof(sudokuGrid));
-    }
-    else if (key == 13) { //Enter
-        initMasks();
+    } else if (key == 13) { //Enter
         sudokuSolver(sudokuGrid);
-    }
-    else if (key == 32) { //Space
+    } else if (key == 32) { //Space
         benchmark();
     }
 
@@ -407,7 +358,7 @@ int main(int argc, char** argv) {
     glutInitWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
     glutCreateWindow("Sudoku Solver");
 
-    if (!gladLoadGL(eglGetProcAddress)) {
+    if(!gladLoadGL(eglGetProcAddress)) {
         printf("Failed to initialize GLAD\n");
         return -1;
     }
